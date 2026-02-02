@@ -1,0 +1,30 @@
+{
+  "name": "automarketing",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.2.0",
+    "@types/socket.io": "^3.0.1",
+    "axios": "^1.13.4",
+    "ccxt": "^4.5.35",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "input": "^1.0.1",
+    "rss-parser": "^3.13.0",
+    "socket.io": "^4.8.3",
+    "telegram": "^2.26.22",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

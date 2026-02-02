@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clawdbot Control</title>
+    <style>
+        :root {
+            --toss-blue: #0064FF;
+            --toss-bg: #F2F4F6;
+            --text-main: #191F28;
+            --text-sub: #8B95A1;
+            --white: #FFFFFF;
+            --red: #FB4359;
+            --green: #2DB400;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--toss-bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            padding-bottom: 100px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .status-badge {
+            background-color: #E5E8EB;
+            color: var(--text-sub);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .status-badge.active {
+            background-color: #E8F3FF;
+            color: var(--toss-blue);
+        }
+
+        .card {
+            background: var(--white);
+            border-radius: 24px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+        }
+
+        .card-title {
+            color: var(--text-sub);
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .control-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 20px;
+            border-radius: 24px 24px 0 0;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .main-btn {
+            width: 100%;
+            max-width: 560px;
+            padding: 18px;
+            border-radius: 16px;
+            border: none;
+            font-size: 18px;
+            font-weight: 700;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-start {
+            background-color: var(--toss-blue);
+        }
+
+        .btn-stop {
+            background-color: var(--red);
+        }
+
+        .btn-loading {
+            background-color: var(--text-sub);
+            pointer-events: none;
+        }
+
+        .feed-list {
+            margin-top: 24px;
+        }
+
+        .feed-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 16px 0;
+            border-bottom: 1px solid #F2F4F6;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .feed-symbol {
+            display: inline-block;
+            background-color: #333;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 6px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .feed-text {
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .feed-time {
+            font-size: 12px;
+            color: var(--text-sub);
+            min-width: 60px;
+            text-align: right;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>Clawdbot</h1>
+        <span id="status-badge" class="status-badge">● Stopped</span>
+    </div>
+
+    <div class="card">
+        <div class="card-title">내 보유 현금 (KRW)</div>
+        <div class="card-value" id="balance-display">로딩중...</div>
+        <div style="font-size: 14px; margin-top: 4px; color: #8B95A1;" id="balance-update-time">업비트 연동 대기중</div>
+    </div>
+
+    <h3 style="margin-top: 32px; font-size: 18px;">실시간 모니터링</h3>
+    <div id="news-feed" class="feed-list">
+    </div>
+
+    <div class="control-panel">
+        <button id="toggle-btn" class="main-btn btn-start" onclick="toggleBot()">
+            ▶️ 봇 가동 시작 (Start Bot)
+        </button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const btn = document.getElementById('toggle-btn');
+        const badge = document.getElementById('status-badge');
+        const balanceDisplay = document.getElementById('balance-display');
+        const balanceTime = document.getElementById('balance-update-time');
+
+        let isRunning = false;
+
+        socket.on('status', (status) => {
+            console.log("Status update:", status);
+            isRunning = (status === 'running');
+            updateUI();
+        });
+
+        socket.on('news', (data) => addFeedItem(data));
+        socket.on('trade', (data) => addFeedItem(data, true));
+
+        // ✅ REAL BALANCE LISTENER
+        socket.on('balance', (data) => {
+            console.log("Balance received:", data);
+            if (data.total !== undefined) {
+                balanceDisplay.innerText = Math.floor(data.total).toLocaleString() + ' 원';
+                const now = new Date();
+                balanceTime.innerText = `최근 갱신: ${now.toLocaleTimeString()}`;
+                balanceTime.style.color = '#0064FF'; // Blue text on update
+            }
+        });
+
+        function updateUI() {
+            if (isRunning) {
+                btn.className = 'main-btn btn-stop';
+                btn.innerHTML = '⏹️ 봇 중지 (Stop Bot)';
+                badge.className = 'status-badge active';
+                badge.innerHTML = '⚡ Running';
+            } else {
+                btn.className = 'main-btn btn-start';
+                btn.innerHTML = '▶️ 봇 가동 시작 (Start Bot)';
+                badge.className = 'status-badge';
+                badge.innerHTML = '● Stopped';
+            }
+        }
+
+        async function toggleBot() {
+            btn.className = 'main-btn btn-loading';
+            btn.innerHTML = '⏳ 처리 중...';
+            const endpoint = isRunning ? '/api/stop' : '/api/start';
+            try {
+                await fetch(endpoint, { method: 'POST' });
+            } catch (e) {
+                alert("서버 연결 실패");
+                location.reload();
+            }
+        }
+
+        function addFeedItem(data, isTrade = false) {
+            const list = document.getElementById('news-feed');
+            const div = document.createElement('div');
+            div.className = 'feed-item';
+            div.style.backgroundColor = isTrade ? '#E8F3FF' : (data.isImportant ? '#FFF0F0' : 'transparent');
+            div.innerHTML = `
+                <div class="feed-content">
+                    ${data.symbol ? `<span class="feed-symbol" style="${isTrade ? 'background:#0064FF' : ''}">${data.symbol}</span>` : ''}
+                    <div class="feed-text">${data.text || (data.action + ' ' + data.amount)}</div>
+                </div>
+                <div class="feed-time">${data.time}</div>
+            `;
+            list.prepend(div);
+        }
+    </script>
+</body>
+
+</html>
