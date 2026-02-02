@@ -15,7 +15,28 @@ app.use(cors());
 app.use(express.static(path.join(__dirname, '../public')));
 app.use(express.json());
 
+
+// Global reference for cleanup
 let listenerProcess: ChildProcess | null = null;
+let scannerProcess: ChildProcess | null = null;
+
+// Cleanup function to kill children
+const cleanup = () => {
+    console.log('\n🔴 Shutting down... Killing child processes...');
+    if (listenerProcess) {
+        listenerProcess.kill();
+        listenerProcess = null;
+    }
+    if (scannerProcess) {
+        scannerProcess.kill();
+        scannerProcess = null;
+    }
+    process.exit(0);
+};
+
+// Handle termination signals
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
 
 io.on('connection', async (socket) => {
     console.log('📱 Dashboard connected');
@@ -61,41 +82,44 @@ app.post('/api/start', (req, res) => {
 
     console.log("🟢 Starting News Listener...");
 
-    listenerProcess = fork(path.join(__dirname, 'run-listener.ts'), [], {
-        execArgv: ['-r', 'ts-node/register']
-    });
+    // Determine extension and args based on environment - ensures build compatibility
+    const isTs = __filename.endsWith('.ts');
+    const ext = isTs ? 'ts' : 'js';
+    const execArgv = isTs ? ['-r', 'ts-node/register'] : [];
 
-    // Spawn the Market Scanner too!
-    const scannerProcess = fork(path.join(__dirname, 'agent/market-scanner.ts'), [], {
-        execArgv: ['-r', 'ts-node/register']
-    });
+    try {
+        listenerProcess = fork(path.join(__dirname, `run-listener.${ext}`), [], {
+            execArgv
+        });
 
-    // Store references (quick hack: we should manage a list of processes, but for now we link them)
-    // We attach scanner to listenerProcess object strictly for killing reference, or just manage global
-    // Let's make a global array.
+        // Spawn the Market Scanner too!
+        scannerProcess = fork(path.join(__dirname, `agent/market-scanner.${ext}`), [], {
+            execArgv
+        });
 
-    // Actually, let's keep it simple. We will kill all children on Stop.
-    (global as any).scannerProcess = scannerProcess;
+        listenerProcess.on('exit', () => {
+            console.log("🔴 News Listener Stopped");
+            listenerProcess = null;
+            io.emit('status', 'stopped');
 
-    listenerProcess.on('exit', () => {
-        console.log("🔴 News Listener Stopped");
-        listenerProcess = null;
-        io.emit('status', 'stopped');
+            // Kill scanner if listener dies
+            if (scannerProcess) {
+                scannerProcess.kill();
+                scannerProcess = null;
+            }
+        });
 
-        // Kill scanner if listener dies
-        if ((global as any).scannerProcess) {
-            (global as any).scannerProcess.kill();
-            (global as any).scannerProcess = null;
-        }
-    });
+        scannerProcess.on('message', (msg) => {
+            // Forward scanner logs to console if needed
+            console.log('[Scanner]:', msg);
+        });
 
-    scannerProcess.on('message', (msg) => {
-        // Forward scanner logs to console if needed
-        console.log('[Scanner]:', msg);
-    });
-
-    io.emit('status', 'running');
-    res.json({ status: 'started' });
+        io.emit('status', 'running');
+        res.json({ status: 'started' });
+    } catch (error) {
+        console.error("Failed to start processes:", error);
+        res.status(500).json({ error: 'Failed to start bot' });
+    }
 });
 
 app.post('/api/stop', (req, res) => {
@@ -104,9 +128,9 @@ app.post('/api/stop', (req, res) => {
         listenerProcess.kill();
         listenerProcess = null;
     }
-    if ((global as any).scannerProcess) {
-        (global as any).scannerProcess.kill();
-        (global as any).scannerProcess = null;
+    if (scannerProcess) {
+        scannerProcess.kill();
+        scannerProcess = null;
         console.log("🔴 Market Scanner Stopped");
     }
 
@@ -132,6 +156,24 @@ app.post('/api/trade', (req, res) => {
         io.emit('balance', balance);
     }, 1000);
     res.sendStatus(200);
+});
+
+// Test-only: place a real market buy with minimum amount (5000 KRW)
+app.post('/api/test-buy', async (req, res) => {
+    const { symbol, amount } = req.body || {};
+    const market = symbol || 'KRW-BTC';
+    const cost = typeof amount === 'number' ? amount : 5000;
+    try {
+        const order = await upbit.createMarketBuyOrder(market, cost);
+        if (!order) {
+            return res.status(400).json({ ok: false, error: 'order_failed_or_rejected', market, cost });
+        }
+        io.emit('trade', { symbol: market, action: 'BUY', price: 0, amount: cost, time: new Date().toLocaleTimeString() });
+        return res.json({ ok: true, orderId: order.id || order.uuid, market, cost });
+    } catch (e) {
+        console.error('Test buy failed:', e);
+        return res.status(500).json({ ok: false, error: e?.message || 'unknown_error', market, cost });
+    }
 });
 
 const PORT = 4000;

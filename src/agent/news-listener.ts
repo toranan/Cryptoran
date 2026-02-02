@@ -3,6 +3,7 @@ import { StringSession } from "telegram/sessions";
 import { NewMessage, NewMessageEvent } from "telegram/events";
 import { UpbitClient } from "../exchange/upbit";
 import axios from 'axios';
+const DASHBOARD_URL = process.env.DASHBOARD_URL || 'http://localhost:4000';
 
 // [Safety] 내가 감시할 채널 ID 목록 (Tree News 등)
 // 실제 채널 ID를 찾아서 넣어야 함. (예: Tree of Alpha ID)
@@ -237,7 +238,7 @@ export class NewsListener {
     }
 
     private sendToDashboard(type: 'news' | 'trade', data: any) {
-        axios.post(`http://localhost:4000/api/${type}`, data).catch(e => {
+        axios.post(`${DASHBOARD_URL}/api/${type}`, data).catch(e => {
             // Ignore dashboard error
         });
     }

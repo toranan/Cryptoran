@@ -211,7 +211,7 @@ async function executeBuyTrade(symbol: string, reason: string, strategyName: str
     }).catch(e => { });
 
     try {
-        const order = await upbit.createMarketBuyOrder(symbol, 10000);
+        const order = await upbit.createMarketBuyOrder(symbol, 20000);
         if (order) {
             if (entryPrice > 0) {
                 entryPrices.set(symbol, entryPrice);
@@ -219,12 +219,18 @@ async function executeBuyTrade(symbol: string, reason: string, strategyName: str
             await axios.post('http://localhost:4000/api/trade', {
                 symbol: symbol,
                 action: 'BUY',
-                amount: 10000, // [Tip] 10만원 시드면 분할매수 고려 (예: 1만원씩)
+                amount: 20000,
                 price: 0
             });
         }
-    } catch (e) {
-        console.error("Buy Execution Failed");
+    } catch (e: any) {
+        console.error(`❌ Buy Execution Failed: ${e.message}`);
+        // Notify dashboard of failure
+        axios.post('http://localhost:4000/api/news', {
+            text: `[Error] ${symbol} Buy Failed: ${e.message}`,
+            symbol: symbol.replace('KRW-', ''),
+            isImportant: true
+        }).catch(e => { });
     }
 }
 
@@ -256,8 +262,13 @@ async function executeSellTrade(
                 price: 0
             });
         }
-    } catch (e) {
-        console.error("Sell Execution Failed");
+    } catch (e: any) {
+        console.error(`❌ Sell Execution Failed: ${e.message}`);
+        axios.post('http://localhost:4000/api/news', {
+            text: `[Error] ${symbol} Sell Failed: ${e.message}`,
+            symbol: currency,
+            isImportant: true
+        }).catch(e => { });
     }
 }
 

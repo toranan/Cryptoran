@@ -11,6 +11,9 @@ export class UpbitClient {
             apiKey: process.env.UPBIT_ACCESS_KEY,
             secret: process.env.UPBIT_SECRET_KEY,
             enableRateLimit: true,
+            options: {
+                createMarketBuyOrderRequiresPrice: false
+            }
         });
     }
 
