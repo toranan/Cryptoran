@@ -55,7 +55,7 @@ export class UpbitClient {
             return order;
         } catch (error) {
             console.error("❌ Order Failed:", error);
-            return null;
+            throw error;
         }
     }
 
@@ -70,7 +70,7 @@ export class UpbitClient {
             return order;
         } catch (error) {
             console.error("❌ Sell Order Failed:", error);
-            return null;
+            throw error;
         }
     }
 
