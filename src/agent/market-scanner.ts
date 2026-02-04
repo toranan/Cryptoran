@@ -10,7 +10,9 @@ const gcr = new GcrStrategy();
 
 const WATCHLIST = [
     'KRW-BTC', 'KRW-ETH', 'KRW-XRP', 'KRW-SOL', 'KRW-DOGE',
-    'KRW-SUI', 'KRW-SEI', 'KRW-NEAR', 'KRW-AVAX', 'KRW-ETC'
+    'KRW-SUI', 'KRW-SEI', 'KRW-NEAR', 'KRW-AVAX', 'KRW-ETC',
+    'KRW-POKT', 'KRW-ONDO', 'KRW-OM', 'KRW-HBAR', 'KRW-LINK',
+    'KRW-ADA', 'KRW-DOT', 'KRW-ATOM', 'KRW-ARB', 'KRW-OP'
 ];
 
 let lastHourlyTime = 0;
@@ -30,8 +32,8 @@ const entryPrices = new Map<string, number>();
 const RS_UPDATE_MS = 60 * 60 * 1000;
 const RS_PRIMARY_HOURS = 24;
 const RS_SECONDARY_HOURS = 4;
-const RS_TOP_N = 10;
-const RS_FOCUS_N = 5;
+const RS_TOP_N = 30;
+const RS_FOCUS_N = 20;
 
 async function scanMarket() {
     if (isRunning) {
@@ -51,10 +53,10 @@ async function scanMarket() {
 
     if (now - lastRsUpdate >= RS_UPDATE_MS) {
         const rsList = await buildRelativeStrengthWatchlist();
-        if (rsList.length > 0) {
-            dynamicWatchlist = rsList;
-            console.log(`\n📈 [RS] Updated watchlist: ${dynamicWatchlist.join(', ')}`);
-        }
+        // 항상 WATCHLIST를 포함하고 RS 상위 코인도 추가
+        const combined = [...new Set([...WATCHLIST, ...rsList])];
+        dynamicWatchlist = combined;
+        console.log(`\n📈 [RS] Updated watchlist (${dynamicWatchlist.length} coins): ${dynamicWatchlist.join(', ')}`);
         lastRsUpdate = now;
     }
 
@@ -222,6 +224,8 @@ async function executeBuyTrade(symbol: string, reason: string, strategyName: str
                 amount: 20000,
                 price: 0
             });
+        } else {
+            throw new Error("UpbitClient returned null (silenced error?)");
         }
     } catch (e: any) {
         console.error(`❌ Buy Execution Failed: ${e.message}`);
