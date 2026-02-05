@@ -248,6 +248,18 @@ async function executeSellTrade(
     const amount = balanceMap.get(currency) || 0;
     if (amount <= 0) return;
 
+    // 업빗 최소 주문금액 5000원 체크
+    try {
+        const ticker = await upbit.getTicker(symbol);
+        const estimatedValue = amount * (ticker?.price || 0);
+        if (estimatedValue < 5000) {
+            // 잔고가 최소 주문금액 미만이면 조용히 무시 (스팸 방지)
+            return;
+        }
+    } catch (e) {
+        // 티커 조회 실패해도 일단 시도
+    }
+
     console.log(`📉 SELL SIGNAL [${strategyName}]: ${symbol} | Reason: ${reason}`);
 
     axios.post('http://localhost:4000/api/news', {
