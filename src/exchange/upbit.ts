@@ -50,7 +50,8 @@ export class UpbitClient {
                 console.warn("⚠️ Minimum order size is 5000 KRW");
                 return null;
             }
-            const order = await this.exchange.createOrder(symbol, 'market', 'buy', undefined, cost);
+            // When createMarketBuyOrderRequiresPrice is false, 'amount' is the cost
+            const order = await this.exchange.createOrder(symbol, 'market', 'buy', cost);
             console.log("✅ Market Buy Order Created:", order.id);
             return order;
         } catch (error) {
