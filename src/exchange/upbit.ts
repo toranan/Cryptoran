@@ -20,6 +20,9 @@ export class UpbitClient {
     async getTicker(symbol: string = 'BTC/KRW') {
         try {
             const ticker = await this.exchange.fetchTicker(symbol);
+            if (!ticker) {
+                throw new Error(`Ticker not found for ${symbol}`);
+            }
             return {
                 symbol: ticker.symbol,
                 price: ticker.last,

@@ -257,7 +257,9 @@ async function executeSellTrade(
             return;
         }
     } catch (e) {
-        // 티커 조회 실패해도 일단 시도
+        // 티커 조회 실패 시 안전을 위해 매도 중단 (소액 잔고일 가능성 높음)
+        // console.error(`⚠️ Ticker check failed for ${symbol}, skipping sell to avoid error spam.`);
+        return;
     }
 
     console.log(`📉 SELL SIGNAL [${strategyName}]: ${symbol} | Reason: ${reason}`);
